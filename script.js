@@ -12,7 +12,7 @@ function parseAsset(value) {
     const url = new URL(/^https?:\/\//i.test(raw) ? raw : 'https://' + raw);
     if (!/(^|\.)roblox\.com$/i.test(url.hostname)) return null;
     const match = url.pathname.match(/\/(catalog|library|bundles|asset|game-pass|badges)\/(\d{1,20})(?:\/|$)/i);
-    if (match) return { id: match[2], bundle: match[1].toLowerCase() === 'bundles' };
+    if (match) return { id: match[2] || match[1], bundle: (match[1] || '').toLowerCase() === 'bundles' };
     const id = url.searchParams.get('id') || url.searchParams.get('assetId');
     if (/^\d{1,20}$/.test(id || '')) return { id, bundle: false };
   } catch { /* Invalid URL */ }
@@ -108,7 +108,7 @@ form.addEventListener('submit', async event => {
   }
 
   try {
-    const response = await fetch(thumbnailEndpoint(asset), { signal: AbortSignal.timeout(12000) });
+    // Roblox's thumbnail JSON API does not allow browser CORS requests.\n    // This public read-only proxy is used for thumbnail metadata only; no login data is sent.\n    const response = await fetch('https://proxy.cors.dev/' + thumbnailEndpoint(asset), { signal: AbortSignal.timeout(12000) });
     if (!response.ok) throw new Error('Thumbnail service returned ' + response.status);
     const data = await response.json();
     if (request !== requestNumber) return;
