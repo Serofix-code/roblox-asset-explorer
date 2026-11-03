@@ -89,6 +89,24 @@ form.addEventListener('submit', async event => {
   content.append(image, details);
   result.replaceChildren(title, content);
 
+  function showFallback() {
+    if (request !== requestNumber) return;
+    const fallbackUrl = 'https://www.roblox.com/asset-thumbnail/image?assetId=' + encodeURIComponent(id) + '&width=420&height=420&format=png';
+    image.hidden = false;
+    image.onerror = () => {
+      image.hidden = true;
+      download.disabled = true;
+      status.textContent = 'Roblox did not provide a public thumbnail for this asset.';
+    };
+    image.onload = () => {
+      download.disabled = false;
+      status.textContent = 'Preview loaded through the image fallback.';
+    };
+    image.src = fallbackUrl;
+    download.onclick = () => saveImage(fallbackUrl, id, status);
+    status.textContent = 'Trying alternate thumbnail source…';
+  }
+
   try {
     const response = await fetch(thumbnailEndpoint(asset), { signal: AbortSignal.timeout(12000) });
     if (!response.ok) throw new Error('Thumbnail service returned ' + response.status);
@@ -97,16 +115,16 @@ form.addEventListener('submit', async event => {
     const item = data?.data?.[0];
     const imageUrl = item?.imageUrl;
     if (!imageUrl || !/^https:\/\//i.test(imageUrl)) {
-      status.textContent = item?.state === 'Pending' ? 'Thumbnail is still processing. Try again shortly.' : 'No public preview is available for this asset.';
+      showFallback();
       return;
     }
     image.src = imageUrl;
     image.hidden = false;
-    image.onerror = () => { status.textContent = 'The thumbnail could not be displayed.'; download.disabled = true; };
+    image.onerror = () => showFallback();
     download.disabled = false;
     download.onclick = () => saveImage(imageUrl, id, status);
     status.textContent = 'Public thumbnail available.';
   } catch {
-    if (request === requestNumber) status.textContent = 'Could not retrieve a preview. Roblox may restrict browser access to this endpoint.';
+    if (request === requestNumber) showFallback();
   }
 });
