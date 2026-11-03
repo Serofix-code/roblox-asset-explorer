@@ -64,6 +64,7 @@ async function downloadTemplate(assetId, button, status) {
   try {
     const proxy = 'https://proxy.cors.dev/';
     const modelResponse = await fetch(proxy + 'https://assetdelivery.roblox.com/v1/asset?id=' + encodeURIComponent(assetId), { signal: AbortSignal.timeout(15000) });
+    if (modelResponse.status === 401 || modelResponse.status === 403) throw new Error('Roblox requires authorized access to the original asset. Public GitHub Pages cannot retrieve this template');
     if (!modelResponse.ok) throw new Error('Roblox asset delivery returned ' + modelResponse.status);
     const xml = await modelResponse.text();
     if (xml.length > 1000000) throw new Error('Unexpected asset response');
@@ -79,6 +80,7 @@ async function downloadTemplate(assetId, button, status) {
     const templateId = match[1];
     status.textContent = 'Downloading original template image #' + templateId + '…';
     const imageResponse = await fetch(proxy + 'https://assetdelivery.roblox.com/v1/asset?id=' + templateId, { signal: AbortSignal.timeout(20000) });
+    if (imageResponse.status === 401 || imageResponse.status === 403) throw new Error('Roblox requires authorized access to the template image');
     if (!imageResponse.ok) throw new Error('Template download returned ' + imageResponse.status);
     const bytes = await imageResponse.blob();
     const header = new Uint8Array(await bytes.slice(0, 12).arrayBuffer());
@@ -95,7 +97,7 @@ async function downloadTemplate(assetId, button, status) {
     setTimeout(() => URL.revokeObjectURL(objectUrl), 15000);
     status.textContent = 'Original clothing template downloaded (image ID #' + templateId + ').';
   } catch (error) {
-    status.textContent = 'Template unavailable: ' + error.message + '. Some Roblox assets cannot be downloaded through a public browser-only website.';
+    status.textContent = 'Template unavailable: ' + error.message + '. For clothing you own or have permission to use, Roblox Studio can access the ShirtTemplate/PantsTemplate property.';
   } finally {
     button.disabled = false;
   }
