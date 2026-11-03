@@ -57,6 +57,50 @@ async function saveImage(url, id, status) {
   }
 }
 
+
+async function downloadTemplate(assetId, button, status) {
+  button.disabled = true;
+  status.textContent = 'Resolving original clothing template…';
+  try {
+    const proxy = 'https://proxy.cors.dev/';
+    const modelResponse = await fetch(proxy + 'https://assetdelivery.roblox.com/v1/asset?id=' + encodeURIComponent(assetId), { signal: AbortSignal.timeout(15000) });
+    if (!modelResponse.ok) throw new Error('Roblox asset delivery returned ' + modelResponse.status);
+    const xml = await modelResponse.text();
+    if (xml.length > 1000000) throw new Error('Unexpected asset response');
+    const doc = new DOMParser().parseFromString(xml, 'application/xml');
+    if (doc.querySelector('parsererror')) throw new Error('Roblox did not return readable clothing data');
+    const clothing = [...doc.querySelectorAll('Item')].find(x => ['Shirt','Pants','ShirtGraphic'].includes(x.getAttribute('class')));
+    if (!clothing) throw new Error('This asset is not a supported classic shirt, pants, or T-shirt');
+    const field = clothing.getAttribute('class') === 'Shirt' ? 'ShirtTemplate' : clothing.getAttribute('class') === 'Pants' ? 'PantsTemplate' : 'Graphic';
+    const content = [...clothing.querySelectorAll('Content')].find(x => x.getAttribute('name') === field);
+    const value = content?.textContent?.trim() || '';
+    const match = value.match(/(?:rbxassetid:\/\/|[?&]id=)(\d{1,20})/i);
+    if (!match) throw new Error('Could not find the original template image ID');
+    const templateId = match[1];
+    status.textContent = 'Downloading original template image #' + templateId + '…';
+    const imageResponse = await fetch(proxy + 'https://assetdelivery.roblox.com/v1/asset?id=' + templateId, { signal: AbortSignal.timeout(20000) });
+    if (!imageResponse.ok) throw new Error('Template download returned ' + imageResponse.status);
+    const bytes = await imageResponse.blob();
+    const header = new Uint8Array(await bytes.slice(0, 12).arrayBuffer());
+    const png = header[0] === 137 && header[1] === 80 && header[2] === 78 && header[3] === 71;
+    const jpg = header[0] === 255 && header[1] === 216;
+    if (!png && !jpg) throw new Error('The template endpoint did not return a PNG or JPEG image');
+    const objectUrl = URL.createObjectURL(bytes);
+    const a = document.createElement('a');
+    a.href = objectUrl;
+    a.download = 'roblox-' + assetId + '-template.' + (png ? 'png' : 'jpg');
+    document.body.append(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(objectUrl), 15000);
+    status.textContent = 'Original clothing template downloaded (image ID #' + templateId + ').';
+  } catch (error) {
+    status.textContent = 'Template unavailable: ' + error.message + '. Some Roblox assets cannot be downloaded through a public browser-only website.';
+  } finally {
+    button.disabled = false;
+  }
+}
+
 form.addEventListener('submit', async event => {
   event.preventDefault();
   const request = ++requestNumber;
@@ -75,13 +119,18 @@ form.addEventListener('submit', async event => {
   image.hidden = true;
 
   const details = node('div', undefined, 'details');
-  const description = node('p', 'Preview and download the public thumbnail image. Original asset files and clothing templates are not available in this version.');
+  const description = node('p', 'Download the public thumbnail or try retrieving the original texture for a classic shirt, pants, or T-shirt. Template downloads depend on Roblox asset access.');
   const actions = node('div', undefined, 'links');
   const download = node('button', 'Download preview PNG');
   download.type = 'button';
   download.disabled = true;
   download.className = 'download';
   actions.append(download);
+  const templateDownload = node('button', 'Download clothing template');
+  templateDownload.type = 'button';
+  templateDownload.className = 'download';
+  templateDownload.onclick = () => downloadTemplate(id, templateDownload, status);
+  actions.append(templateDownload);
   const url = bundle ? 'https://www.roblox.com/bundles/' + id : 'https://www.roblox.com/catalog/' + id;
   actions.append(link('View on Roblox ↗', url));
   details.append(description, status, actions);
