@@ -108,7 +108,9 @@ form.addEventListener('submit', async event => {
   }
 
   try {
-    // Roblox's thumbnail JSON API does not allow browser CORS requests.\n    // This public read-only proxy is used for thumbnail metadata only; no login data is sent.\n    const response = await fetch('https://proxy.cors.dev/' + thumbnailEndpoint(asset), { signal: AbortSignal.timeout(12000) });
+    // Roblox's thumbnail API does not allow cross-origin browser requests.
+    // This proxy requests public thumbnail metadata without account credentials.
+    const response = await fetch('https://proxy.cors.dev/' + thumbnailEndpoint(asset), { signal: AbortSignal.timeout(12000) });
     if (!response.ok) throw new Error('Thumbnail service returned ' + response.status);
     const data = await response.json();
     if (request !== requestNumber) return;
